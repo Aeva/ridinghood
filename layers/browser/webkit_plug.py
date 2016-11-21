@@ -17,17 +17,17 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import sys, os.path
+import sys
+import os.path
 import gi
 gi.require_version("WebKit", "3.0")
 from gi.repository import WebKit, Gtk, GObject
 
 
-class MainWindow(Gtk.Window):
-    def __init__(self, url, *args, **kargs):
-        Gtk.Window.__init__(self, *args, **kargs)
+class BrowserWidget(Gtk.Plug):
+    def __init__(self, url):
+        Gtk.Plug.__init__(self)
 
-        self.set_default_size(400, 400)
         self.connect("destroy", Gtk.main_quit)
         self.webview = WebKit.WebView()
         settings = self.webview.get_settings()
@@ -41,10 +41,10 @@ class MainWindow(Gtk.Window):
         self.webview.load_uri(url)
 
 if __name__ == "__main__":
-    url = "http://pirateradiotheater.org"
-    if len(sys.argv) > 1:
-        url = sys.argv.pop(1)
+    url = sys.argv[1]
 
     Gtk.init()
-    MainWindow(url)
+    w = BrowserWidget(url)
+    sys.stdout.write("PLUG ID: %s\n" % str(w.get_id()))
+    sys.stdout.flush()
     Gtk.main()
