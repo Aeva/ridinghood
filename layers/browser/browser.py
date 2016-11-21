@@ -26,23 +26,25 @@ from gi.repository import WebKit, Gtk, GObject
 class MainWindow(Gtk.Window):
     def __init__(self, url, *args, **kargs):
         Gtk.Window.__init__(self, *args, **kargs)
-        self.set_default_size(1024, 768)
+
+        self.set_default_size(400, 400)
         self.connect("destroy", Gtk.main_quit)
         self.webview = WebKit.WebView()
         settings = self.webview.get_settings()
+        settings.set_property("enable-developer-extras", True)
         #settings.set_property("enable-webgl", True)
-        #settings.set_property("enable-developer-extras", True)
 
-
-        self.add(self.webview)
-        self.show_all()
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.add(self.webview)
+        self.add(scrolled_window)
+        self.show_all()        
         self.webview.load_uri(url)
-        
 
 if __name__ == "__main__":
-    url = "https://wikipedia.com"
-    if len(sys.argv) > 0:
-        url = sys.argv[0];
+    url = "http://pirateradiotheater.org"
+    if len(sys.argv) > 1:
+        url = sys.argv.pop(1)
 
-    w = MainWindow(url)
+    Gtk.init()
+    MainWindow(url)
     Gtk.main()
