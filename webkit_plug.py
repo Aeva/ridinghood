@@ -23,9 +23,13 @@ import gi
 gi.require_version("WebKit", "3.0")
 from gi.repository import WebKit, Gtk, GObject
 
+from universe import IpcHandler
+
 
 class BrowserWidget(Gtk.Plug):
     def __init__(self, url):
+        self.ipc = IpcHandler()
+        
         Gtk.Plug.__init__(self)
 
         self.connect("destroy", Gtk.main_quit)
@@ -37,14 +41,14 @@ class BrowserWidget(Gtk.Plug):
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.add(self.webview)
         self.add(scrolled_window)
-        self.show_all()        
+        self.show_all()
+        
+        self.ipc.send("PLUG ID: %s\n" % str(self.get_id()))
         self.webview.load_uri(url)
 
 if __name__ == "__main__":
     url = sys.argv[1]
 
     Gtk.init()
-    w = BrowserWidget(url)
-    sys.stdout.write("PLUG ID: %s\n" % str(w.get_id()))
-    sys.stdout.flush()
+    BrowserWidget(url)
     Gtk.main()
