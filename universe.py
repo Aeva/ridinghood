@@ -17,12 +17,14 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import re
 import sys
 import time
 import json
 import select
 import subprocess
 from threading import Thread, Lock, Event
+from gi.repository import GLib
 
 
 class IpcHandler(Thread):
@@ -49,7 +51,7 @@ class IpcHandler(Thread):
                 self.__lock.release()
                 self.__ready.set()
                 if self.__signal:
-                    self.__signal()
+                    GLib.idle_add(self.__signal)
             time.sleep(0.01)
     
     def send(self, packet):
@@ -69,6 +71,23 @@ class IpcHandler(Thread):
             self.__new_data = []
             self.__lock.release()
         return data
+
+    
+class IpcListener(object):
+    _event_routing = {}
+
+    def __init__(self, ipc):
+        self._ipc = ipc
+
+    def send(self, packet):
+        self._ipc.send(packet)
+                
+    def routing_event(self):
+        for line in self.universe.ipc.read():
+            for pattern, handler in self._event_routing.items():
+                match = re.match(pattern, line)
+                if match:
+                    self.__getattribute__(handler)(**match.groupdict())
 
 
 class Universe(object):

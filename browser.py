@@ -17,15 +17,13 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import re
-
 import gi
 from gi.repository import Gtk, GObject
-from universe import Universe
+from universe import Universe, IpcListener
 
 
-class BrowserTab(object):
-    __event_routing = {
+class BrowserTab(IpcListener):
+    _event_routing = {
         r'^PLUG ID: (?P<plug_id>\d+)$': "attach_event",
     }
     
@@ -47,16 +45,6 @@ class BrowserTab(object):
     def attach_event(self, plug_id):
         self.socket.add_id(int(plug_id))
 
-    def routing_event(self):
-        # This is currently *not* called by the main thread because of
-        # the current ipc scheme, though I'm not actually sure that
-        # matters as far as Gtk thread safety goes.
-
-        for line in self.universe.ipc.read():
-            for pattern, handler in self.__event_routing.items():
-                match = re.match(pattern, line)
-                if match:
-                    self.__getattribute__(handler)(**match.groupdict())
         
 class BrowserWindow(object):
     def __init__(self):
