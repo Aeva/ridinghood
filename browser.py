@@ -16,54 +16,30 @@
 # You should have received a copy of the GNU General Public License
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
-import subprocess
-import select
-import time
-import re
 
 import gi
 from gi.repository import Gtk, GObject
+from universe import Universe
 
 
 class BrowserTab(object):
-    def __init__(self, url, notebook):
+    def __init__(self, parent, url):
         self.url = url
-        self._notebook = notebook
+        self.parent = parent
+        self._notebook = parent.notebook
         self.socket = Gtk.Socket()
         self.socket.show()
         self._notebook.append_page(self.socket, Gtk.Label('lorem ipsum'))
         print "New tab:", url
-        self.create_webkit_process(url)
+        self.universe = Universe(self)
 
     def close_event(self, *args, **kargs):
         print "Closing tab:", self.url
         self._notebook.remove(self.socket)
-        self.proc.kill()
+        self.universe.destroy()
 
-    def create_webkit_process(self, url):
-        args_list = ["python", "webkit_plug.py", url]
-        self.proc = subprocess.Popen(args_list, stdout=subprocess.PIPE)
-
-        start = time.time()
-        plug_id = None
-        plug_pattern = r'^PLUG ID: (?P<plug_id>\d+)$'
-        while True:
-            ready = select.select([self.proc.stdout], [], [])[0]
-            if ready:
-                line = ready[0].readline()
-                match = re.match(plug_pattern, line)
-                if match:
-                    plug_id = int(match.groupdict()['plug_id'])
-                    break
-            time.sleep(0.01)
-            if time.time() - start > 1:
-                break
-            
-        if plug_id:
-            self.socket.add_id(plug_id)
-
-        else:
-            print "ERROR: No browser plug found."
+    def attach_event(self, plug_id):
+        self.socket.add_id(plug_id)
 
         
 class BrowserWindow(object):
@@ -85,8 +61,8 @@ class BrowserWindow(object):
             self.notebook.remove_page(page)
             
         # create a new tab
-        self.tabs.append(BrowserTab("http://pirateradiotheater.org", self.notebook))
-        self.tabs.append(BrowserTab("http://duckduckgo.com", self.notebook))
+        self.tabs.append(BrowserTab(self, "http://pirateradiotheater.org"))
+        self.tabs.append(BrowserTab(self, "http://duckduckgo.com"))
 
     def open_url_event(self, *args, **kargs):
         new_url = self.url_bar.get_text()
