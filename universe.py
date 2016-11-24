@@ -51,7 +51,10 @@ class IpcHandler(Thread):
                 self.__lock.release()
                 self.__ready.set()
                 if self.__signal:
-                    GLib.idle_add(self.__signal)
+                    if hasattr(self.__signal, "routing_event"):
+                        GLib.idle_add(self.__signal.routing_event)
+                    elif hasattr(self.__signal, "__call__"):
+                        GLib.idle_add(self.__signal)
             time.sleep(0.01)
     
     def send(self, packet):
@@ -83,7 +86,7 @@ class IpcListener(object):
         self._ipc.send(packet)
                 
     def routing_event(self):
-        for line in self.universe.ipc.read():
+        for line in self._ipc.read():
             for pattern, handler in self._event_routing.items():
                 match = re.match(pattern, line)
                 if match:
@@ -95,7 +98,7 @@ class Universe(object):
         args_list = ["python", "webkit_plug.py", tab.url]
         self.proc = subprocess.Popen(
             args_list, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.ipc = IpcHandler(self.proc.stdout, self.proc.stdin, tab.routing_event)
+        self.ipc = IpcHandler(self.proc.stdout, self.proc.stdin, tab)
         
     def destroy(self):
         print "Destroying universe"

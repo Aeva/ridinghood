@@ -17,22 +17,24 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import sys
-import os.path
 import gi
 gi.require_version("WebKit", "3.0")
 from gi.repository import WebKit, Gtk, GObject
 
-from universe import IpcHandler
+from universe import IpcHandler, IpcListener
 
 
-class BrowserWidget(Gtk.Plug):
-    def __init__(self, url):
-        self.ipc = IpcHandler()
+class BrowserWorker(IpcListener):
+    _event_routing = {
+        r'^NAVIGATE: (?P<uri>.*)$': "navigate_event",
+    }
+
+    def __init__(self):
+        IpcListener.__init__(self, IpcHandler(signal=self))
         
-        Gtk.Plug.__init__(self)
-
-        self.connect("destroy", Gtk.main_quit)
+        self.plug = Gtk.Plug()
+        self.plug.connect("destroy", Gtk.main_quit)
+        
         self.webview = WebKit.WebView()
         settings = self.webview.get_settings()
         settings.set_property("enable-developer-extras", True)
@@ -40,15 +42,15 @@ class BrowserWidget(Gtk.Plug):
 
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.add(self.webview)
-        self.add(scrolled_window)
-        self.show_all()
-        
-        self.ipc.send("PLUG ID: %s\n" % str(self.get_id()))
-        self.webview.load_uri(url)
+        self.plug.add(scrolled_window)
+        self.plug.show_all()
+        self.send("PLUG ID: %s" % str(self.plug.get_id()))
+
+    def navigate_event(self, uri):
+        print "Navigating to:", uri
+        self.webview.load_uri(uri)
 
 if __name__ == "__main__":
-    url = sys.argv[1]
-
     Gtk.init()
-    BrowserWidget(url)
+    BrowserWorker()
     Gtk.main()

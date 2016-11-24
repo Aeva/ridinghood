@@ -29,13 +29,18 @@ class BrowserTab(IpcListener):
     
     def __init__(self, parent, url):
         self.url = url
+        self.title = "New Tab"
         self.parent = parent
         self._notebook = parent.notebook
         self.socket = Gtk.Socket()
         self.socket.show()
-        self._notebook.append_page(self.socket, Gtk.Label('lorem ipsum'))
+        self._notebook.append_page(self.socket, Gtk.Label(self.title))
         print "New tab:", url
+        
         self.universe = Universe(self)
+        IpcListener.__init__(self, self.universe.ipc)
+
+        self.send("NAVIGATE: %s" % url)
 
     def close_event(self, *args, **kargs):
         print "Closing tab:", self.url
