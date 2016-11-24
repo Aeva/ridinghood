@@ -31,13 +31,14 @@ class BrowserTab(object):
         self._notebook = notebook
         self.socket = Gtk.Socket()
         self.socket.show()
-        self.page_number = self._notebook.append_page(self.socket, Gtk.Label('lorem ipsum'))
+        self._notebook.append_page(self.socket, Gtk.Label('lorem ipsum'))
         print "New tab:", url
         self.create_webkit_process(url)
 
     def close_event(self, *args, **kargs):
         print "Closing tab:", self.url
-        self._notebook.remove(self.page_number)
+        self._notebook.remove(self.socket)
+        self.proc.kill()
 
     def create_webkit_process(self, url):
         args_list = ["python", "webkit_plug.py", url]
@@ -101,6 +102,8 @@ class BrowserWindow(object):
         print "Refresh Event"
 
     def shutdown_event(self, *args, **kargs):
+        for tab in self.tabs:
+            tab.close_event()
         Gtk.main_quit()
 
 
