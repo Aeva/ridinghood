@@ -40,14 +40,24 @@ class BrowserWorker(IpcListener):
         settings.set_property("enable-developer-extras", True)
         #settings.set_property("enable-webgl", True)
 
+        self.webview.connect('load-finished', self.push_page_load)
+        self.webview.connect("notify::title", self.push_title_change)
+
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.add(self.webview)
         self.plug.add(scrolled_window)
         self.plug.show_all()
         self.send("PLUG ID: %s" % str(self.plug.get_id()))
 
+    def push_page_load(self, *args, **kargs):
+        pass
+
+    def push_title_change(self, *args, **kargs):
+        title = self.webview.get_title()
+        if title:
+            self.send("TITLE: %s" % str(title))
+
     def navigate_event(self, uri):
-        print "Navigating to:", uri
         self.webview.load_uri(uri)
 
 if __name__ == "__main__":

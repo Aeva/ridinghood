@@ -25,6 +25,7 @@ from universe import Universe, IpcListener
 class BrowserTab(IpcListener):
     _event_routing = {
         r'^PLUG ID: (?P<plug_id>\d+)$': "attach_event",
+        r'^TITLE: (?P<new_title>.*)$': "title_changed_event",
     }
     
     def __init__(self, parent, url):
@@ -34,7 +35,9 @@ class BrowserTab(IpcListener):
         self._notebook = parent.notebook
         self.socket = Gtk.Socket()
         self.socket.show()
-        self._notebook.append_page(self.socket, Gtk.Label(self.title))
+        self.label = Gtk.Label(self.title)
+        self.label.show()
+        self._notebook.append_page(self.socket, self.label)
         print "New tab:", url
         
         self.universe = Universe(self)
@@ -49,6 +52,9 @@ class BrowserTab(IpcListener):
 
     def attach_event(self, plug_id):
         self.socket.add_id(int(plug_id))
+
+    def title_changed_event(self, new_title):
+        self.label.set_text(new_title[:5])
 
         
 class BrowserWindow(object):
