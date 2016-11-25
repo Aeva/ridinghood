@@ -42,7 +42,7 @@ class BrowserTab(IpcListener):
         self.universe = Universe(self)
         IpcListener.__init__(self, self.universe.ipc)
         self.tab_store = self.browser.tab_store
-        self.tree_iter = self.tab_store.append(None, [self.title])
+        self.tree_iter = self.tab_store.append(None, [self.title, self.uuid])
         
         self.navigate_to(url)
 
@@ -56,7 +56,7 @@ class BrowserTab(IpcListener):
         self.request_history_state()
     
     def mute(self):
-        print "tab lost focus"
+        pass
         
     def close_event(self, *args, **kargs):
         self.universe.destroy()
@@ -98,11 +98,12 @@ class BrowserWindow(object):
         self.focused = None
         self.tab_store = builder.get_object("TabTreeStore")
         self.tab_tree_view = builder.get_object("TabTreeView")
+        self.tab_tree_view.set_activate_on_single_click(True)
 
         # setup the treeview's renderer
         renderer = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Tab Title", renderer, text=0)
-        self.tab_tree_view.append_column(column)
+        self.title_column = Gtk.TreeViewColumn("Tab Title", renderer, text=0)
+        self.tab_tree_view.append_column(self.title_column)
         self.tab_tree_view.connect("row_activated", self.tree_activates_tab)
 
         # self.views tracks all of the sockets
@@ -115,13 +116,12 @@ class BrowserWindow(object):
         self.new_tab("http://duckduckgo.com")
 
     def tree_activates_tab(self, tree_view, path, column):
-        print "tree activates tab"
-        # tree_iter = self.tab_store.get_iter(path)
-        # uuid = self.tab_store.get_value(tree_iter)
-        # tab = self.tabs[uuid]
-        # self.focus_tab(tab)
+        tree_iter = self.tab_store.get_iter(path)
+        uuid = self.tab_store.get_value(tree_iter, 1)
+        tab = self.tabs[uuid]
+        self.focus_tab(tab, False)
 
-    def focus_tab(self, tab):
+    def focus_tab(self, tab, update_highlight=True):
         if self.focused:
             self.focused.mute()
             self.focused.socket.hide()
@@ -130,6 +130,10 @@ class BrowserWindow(object):
         tab.focus()
         tab.socket.show()
         self.req_history_update()
+        if update_highlight:
+            path = self.tab_store.get_path(tab.tree_iter)
+            selector = self.tab_tree_view.get_selection()
+            selector.select_path(path)
 
     def new_tab(self, uri):
         tab = BrowserTab(self, uri)

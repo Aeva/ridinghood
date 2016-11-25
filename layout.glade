@@ -337,6 +337,8 @@
     <columns>
       <!-- column-name Tab Title -->
       <column type="gchararray"/>
+      <!-- column-name Tab UUID -->
+      <column type="gchararray"/>
     </columns>
   </object>
 </interface>
