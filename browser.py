@@ -102,6 +102,7 @@ class BrowserWindow(object):
 
         # setup the treeview's renderer
         renderer = Gtk.CellRendererText()
+        renderer.set_property("ellipsize", 3)
         self.title_column = Gtk.TreeViewColumn("Tab Title", renderer, text=0)
         self.tab_tree_view.append_column(self.title_column)
         self.tab_tree_view.connect("row_activated", self.tree_activates_tab)
