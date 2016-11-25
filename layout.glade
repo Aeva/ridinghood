@@ -291,7 +291,7 @@
                       <object class="GtkTreeView" id="TabTreeView">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
-                        <property name="model"/>
+                        <property name="model">TabTreeStore</property>
                         <property name="headers_visible">False</property>
                         <property name="search_column">1</property>
                         <property name="level_indentation">8</property>

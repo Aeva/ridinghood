@@ -109,7 +109,7 @@ class BrowserWindow(object):
         self.views = builder.get_object("ViewPorts")
 
         window.show_all()
-            
+        
         # create a new tab
         self.new_tab("http://pirateradiotheater.org")
         self.new_tab("http://duckduckgo.com")
