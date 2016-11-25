@@ -17,6 +17,7 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import json
 import gi
 from gi.repository import Gtk, GObject
 from universe import Universe, IpcListener
@@ -75,6 +76,7 @@ class BrowserTab(IpcListener, TabLabel):
     _event_routing = {
         r'^PLUG ID: (?P<plug_id>\d+)$': "attach_event",
         r'^TITLE: (?P<new_title>.*)$': "title_changed_event",
+        r'^HISTORY_STATE: (?P<blob>.*)$': "update_history_state",
     }
     
     def __init__(self, parent, url):
@@ -91,7 +93,8 @@ class BrowserTab(IpcListener, TabLabel):
 
     def activate(self, *args, **kargs):
         self.parent.focus_tab(self)
-
+        self.request_history_state()
+        
     def close_event(self, *args, **kargs):
         print "Closing tab:", self.url
         self.universe.destroy()
@@ -102,6 +105,13 @@ class BrowserTab(IpcListener, TabLabel):
 
     def title_changed_event(self, new_title):
         self.label.set_text(new_title)
+
+    def request_history_state(self):
+        self.send("REQ_HISTORY")
+
+    def update_history_state(self, blob):
+        back, forward = json.loads(blob)
+        self.parent.update_history_buttons(back, forward)
 
         
 class BrowserWindow(object):
@@ -114,6 +124,9 @@ class BrowserWindow(object):
         window.set_default_size(900, 675)
 
         self.url_bar = builder.get_object("UrlBar")
+        self.history_forward = builder.get_object("HistoryForward")
+        self.history_backward = builder.get_object("HistoryBackward")
+        self.refresh_button = builder.get_object("Refresh")
 
         # tabs tracks the objects in the sidebar
         self.tabs = builder.get_object("BrowserTabs")
@@ -138,6 +151,7 @@ class BrowserWindow(object):
 
         self.focused = tab
         tab.focus()
+        self.req_history_update()
 
     def new_tab(self, uri):
         tab = BrowserTab(self, uri)
@@ -151,11 +165,23 @@ class BrowserWindow(object):
         new_url = self.url_bar.get_text()
         print "Navigate to:", new_url
 
+    def req_history_update(self):
+        if self.focused:
+            self.focused.request_history_state()
+
+    def update_history_buttons(self, back, forward):
+        if back:
+            self.history_backward.set_sensitive(back)
+        if forward:
+            self.history_forward.set_sensitive(forward)
+
     def history_back(self, *args, **kargs):
-        print "History Back Event"
+        self.focused.send("HISTORY_BACKWARD")
+        self.req_history_update()
         
     def history_forward(self, *args, **kargs):
-        print "History Forward Event"
+        self.focused.send("HISTORY_FORWARD")
+        self.req_history_update()
 
     def refresh_page(self, *args, **kargs):
         print "Refresh Event"

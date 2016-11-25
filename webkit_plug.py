@@ -17,6 +17,7 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import json
 import gi
 gi.require_version("WebKit", "3.0")
 from gi.repository import WebKit, Gtk, GObject
@@ -27,6 +28,9 @@ from universe import IpcHandler, IpcListener
 class BrowserWorker(IpcListener):
     _event_routing = {
         r'^NAVIGATE: (?P<uri>.*)$': "navigate_event",
+        r'^REQ_HISTORY$' : "update_history_state",
+        r'^HISTORY_FORWARD$' : "history_forward",
+        r'^HISTORY_BACKWARD$' : "history_backward",
     }
 
     def __init__(self):
@@ -60,6 +64,19 @@ class BrowserWorker(IpcListener):
 
     def navigate_event(self, uri):
         self.webview.load_uri(uri)
+
+    def update_history_state(self):
+        data = json.dumps((
+            self.webview.can_go_back(),
+            self.webview.can_go_forward(),
+        ))
+        self.send("HISTORY_STATE: %s" % data)
+
+    def history_forward(self):
+        self.webview.go_forward()
+
+    def history_backward(self):
+        self.webview.go_back()
 
 if __name__ == "__main__":
     Gtk.init()
