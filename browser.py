@@ -77,6 +77,7 @@ class BrowserTab(IpcListener, TabLabel):
         r'^PLUG ID: (?P<plug_id>\d+)$': "attach_event",
         r'^TITLE: (?P<new_title>.*)$': "title_changed_event",
         r'^HISTORY_STATE: (?P<blob>.*)$': "update_history_state",
+        r'^URI: (?P<uri>.*)$': "update_uri",
     }
     
     def __init__(self, parent, url):
@@ -88,8 +89,11 @@ class BrowserTab(IpcListener, TabLabel):
         TabLabel.__init__(self)
         IpcListener.__init__(self, self.universe.ipc)
 
-        self.send("NAVIGATE: %s" % url)
+        self.navigate_to(url)
         self.connect("clicked", self.activate)
+
+    def navigate_to(self, url):
+        self.send("NAVIGATE: %s" % url)
 
     def activate(self, *args, **kargs):
         self.parent.focus_tab(self)
@@ -112,6 +116,9 @@ class BrowserTab(IpcListener, TabLabel):
     def update_history_state(self, blob):
         back, forward = json.loads(blob)
         self.parent.update_history_buttons(back, forward)
+
+    def update_uri(self, uri):
+        self.parent.url_bar.set_text(uri)
 
         
 class BrowserWindow(object):
@@ -163,8 +170,9 @@ class BrowserWindow(object):
 
     def open_url_event(self, *args, **kargs):
         new_url = self.url_bar.get_text()
-        print "Navigate to:", new_url
-
+        self.focused.navigate_to(new_url)
+        self.focused.socket.child_focus(1)
+        
     def req_history_update(self):
         if self.focused:
             self.focused.request_history_state()

@@ -45,7 +45,7 @@ class BrowserWorker(IpcListener):
         settings.set_property("enable-developer-extras", True)
         #settings.set_property("enable-webgl", True)
 
-        self.webview.connect('load-finished', self.push_page_load)
+        self.webview.connect("load-started", self.load_start_event)
         self.webview.connect("notify::title", self.push_title_change)
 
         scrolled_window = Gtk.ScrolledWindow()
@@ -55,9 +55,11 @@ class BrowserWorker(IpcListener):
         self.plug.show_all()
         self.send("PLUG ID: %s" % str(self.plug.get_id()))
 
-    def push_page_load(self, *args, **kargs):
-        pass
-
+    def load_start_event(self, *args, **kargs):
+        uri = self.webview.get_uri()
+        self.send("URI: %s" % uri)
+        self.update_history_state()
+    
     def push_title_change(self, *args, **kargs):
         title = self.webview.get_title()
         if title:
@@ -65,6 +67,7 @@ class BrowserWorker(IpcListener):
 
     def navigate_event(self, uri):
         self.webview.load_uri(uri)
+        self.send("URI: %s" % uri)
 
     def update_history_state(self):
         data = json.dumps((
