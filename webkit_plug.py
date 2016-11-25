@@ -45,6 +45,7 @@ class BrowserWorker(IpcListener):
 
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.add(self.webview)
+        self.plug.set_default_size(800, 600)
         self.plug.add(scrolled_window)
         self.plug.show_all()
         self.send("PLUG ID: %s" % str(self.plug.get_id()))
