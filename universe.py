@@ -87,10 +87,15 @@ class IpcListener(object):
                 
     def routing_event(self):
         for line in self._ipc.read():
+            handled = False
             for pattern, handler in self._event_routing.items():
                 match = re.match(pattern, line)
                 if match:
                     self.__getattribute__(handler)(**match.groupdict())
+                    handled = True
+                    break
+            if not handled and line.strip():
+                print "No handler found: %s" % line.strip()
 
 
 class Universe(object):
