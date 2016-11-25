@@ -31,6 +31,7 @@ class BrowserWorker(IpcListener):
         r'^REQ_HISTORY$' : "update_history_state",
         r'^HISTORY_FORWARD$' : "history_forward",
         r'^HISTORY_BACKWARD$' : "history_backward",
+        r'^RELOAD$' : "reload",
     }
 
     def __init__(self):
@@ -79,6 +80,9 @@ class BrowserWorker(IpcListener):
     def history_backward(self):
         self.webview.go_back()
         self.update_history_state()
+
+    def reload(self):
+        self.webview.reload()
 
 if __name__ == "__main__":
     Gtk.init()

@@ -182,7 +182,7 @@ class BrowserWindow(object):
         self.focused.send("HISTORY_FORWARD")
 
     def refresh_page(self, *args, **kargs):
-        print "Refresh Event"
+        self.focused.send("RELOAD")
 
     def shutdown_event(self, *args, **kargs):
         for tab in self.tabs:
