@@ -56,7 +56,6 @@ class BrowserTab(IpcListener):
 
     def focus(self):
         self.request_history_state()
-        print "tab has focus"
     
     def mute(self):
         print "tab lost focus"
@@ -128,17 +127,17 @@ class BrowserWindow(object):
     def focus_tab(self, tab):
         if self.focused:
             self.focused.mute()
+            self.focused.socket.hide()
 
         self.focused = tab
         tab.focus()
+        tab.socket.show()
         self.req_history_update()
 
     def new_tab(self, uri):
         tab = BrowserTab(self, uri)
         self.tabs[tab.uuid] = tab
         self.views.pack_start(tab.socket, True, True, 0)
-        tab.socket.hide()
-        
         self.focus_tab(tab)
 
     def open_url_event(self, *args, **kargs):
