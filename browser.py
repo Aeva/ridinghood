@@ -18,61 +18,14 @@
 
 
 import json
+import uuid
+
 import gi
 from gi.repository import Gtk, GObject
 from universe import Universe, IpcListener
 
-
-class TabLabel(Gtk.Button):
-    def __init__(self):
-        Gtk.Button.__init__(self)
-        self.set_relief(2)
-        self.focused = False
-        
-        self.box = Gtk.HBox()
-        self.add(self.box)
-        
-        self.label = Gtk.Label()
-        self.label.set_ellipsize(3)
-        self.label.set_xalign(0)
-        
-        self.icon = Gtk.Image()
-        self.icon.set_from_stock("gtk-remove", 1)
-        self.button = Gtk.Button()
-        self.button.set_relief(2)
-        self.button.add(self.icon)
-        
-        self.box.pack_start(self.label, True, True, 0)
-        self.box.pack_start(self.button, False, False, 0)
-        self.show_all()
-        self.button.set_visible(False)
-        
-        self.set_text("New Page")
-
-        # self.connect("enter-notify-event", self.enter_notify_event)
-        # self.connect("leave-notify-event", self.leave_notify_event)
-
-    def focus(self):
-        self.focused = True
-        self.set_relief(1)
-        self.socket.show()
-
-    def mute(self):
-        self.focused = False
-        self.set_relief(2)
-        self.socket.hide()
-
-    def set_text(self, new_text):
-        self.label.set_text(new_text)
-
-    def enter_notify_event(self, *args, **kargs):
-        self.button.set_visible(True)
     
-    def leave_notify_event(self, *args, **kargs):
-        self.button.set_visible(False)
-
-    
-class BrowserTab(IpcListener, TabLabel):
+class BrowserTab(IpcListener):
     _event_routing = {
         r'^PLUG ID: (?P<plug_id>\d+)$': "attach_event",
         r'^TITLE: (?P<new_title>.*)$': "title_changed_event",
@@ -80,24 +33,33 @@ class BrowserTab(IpcListener, TabLabel):
         r'^URI: (?P<uri>.*)$': "update_uri",
     }
     
-    def __init__(self, parent, url):
+    def __init__(self, browser, url):
+        self.uuid = uuid.uuid4().hex
         self.url = url
         self.title = "New Tab"
-        self.parent = parent
+        self.browser = browser
         self.socket = Gtk.Socket()
         self.universe = Universe(self)
-        TabLabel.__init__(self)
         IpcListener.__init__(self, self.universe.ipc)
+        self.tab_store = self.browser.tab_store
+        #self.tree_iter = self.tab_store.append(None, [self.title, self.uuid])
+        self.tree_iter = self.tab_store.append(None, [self.title])
 
         self.navigate_to(url)
-        self.connect("clicked", self.activate)
+        #self.connect("clicked", self.activate)
 
     def navigate_to(self, url):
         self.send("NAVIGATE: %s" % url)
 
     def activate(self, *args, **kargs):
-        self.parent.focus_tab(self)
+        self.browser.focus_tab(self)
+
+    def focus(self):
         self.request_history_state()
+        print "tab has focus"
+    
+    def mute(self):
+        print "tab lost focus"
         
     def close_event(self, *args, **kargs):
         print "Closing tab:", self.url
@@ -108,17 +70,18 @@ class BrowserTab(IpcListener, TabLabel):
         self.socket.add_id(int(plug_id))
 
     def title_changed_event(self, new_title):
-        self.label.set_text(new_title)
+        self.title = new_title
+        self.tab_store[self.tree_iter][0] = self.title
 
     def request_history_state(self):
         self.send("REQ_HISTORY")
 
     def update_history_state(self, blob):
         back, forward = json.loads(blob)
-        self.parent.update_history_buttons(back, forward)
+        self.browser.update_history_buttons(back, forward)
 
     def update_uri(self, uri):
-        self.parent.url_bar.set_text(uri)
+        self.browser.url_bar.set_text(uri)
 
         
 class BrowserWindow(object):
@@ -131,17 +94,21 @@ class BrowserWindow(object):
         window.set_default_size(900, 675)
 
         self.url_bar = builder.get_object("UrlBar")
+        self.refresh_button = builder.get_object("Refresh")
         self.history_forward = builder.get_object("HistoryForward")
         self.history_backward = builder.get_object("HistoryBackward")
-        self.refresh_button = builder.get_object("Refresh")
 
-        # tabs tracks the objects in the sidebar
-        self.tabs = builder.get_object("BrowserTabs")
+        # tabs tracks the open BrowserTab objects
+        self.tabs = {}
         self.focused = None
+        self.tab_store = builder.get_object("TabTreeStore")
+        self.tab_tree_view = builder.get_object("TabTreeView")
 
-        # remove any placeholder pages that might be in the glade file
-        for widget in self.tabs.get_children():
-            self.tabs.remove(widget)
+        # setup the treeview's renderer
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Tab Title", renderer, text=0)
+        self.tab_tree_view.append_column(column)
+        #self.tab_tree_view.connect("row_activated", self.tree_activates_tab)
 
         # self.views tracks all of the sockets
         self.views = builder.get_object("ViewPorts")
@@ -151,6 +118,12 @@ class BrowserWindow(object):
         # create a new tab
         self.new_tab("http://pirateradiotheater.org")
         self.new_tab("http://duckduckgo.com")
+
+    def tree_activates_tab(self, tree_view, path, column):
+        tree_iter = self.tab_store.get_iter(path)
+        uuid = self.tab_store.get_value(tree_iter)
+        tab = self.tabs[uuid]
+        self.focus_tab(tab)
 
     def focus_tab(self, tab):
         if self.focused:
@@ -162,7 +135,7 @@ class BrowserWindow(object):
 
     def new_tab(self, uri):
         tab = BrowserTab(self, uri)
-        self.tabs.pack_start(tab, False, False, 0)
+        self.tabs[tab.uuid] = tab
         self.views.pack_start(tab.socket, True, True, 0)
         tab.socket.hide()
         
@@ -193,7 +166,7 @@ class BrowserWindow(object):
         self.focused.send("RELOAD")
 
     def shutdown_event(self, *args, **kargs):
-        for tab in self.tabs:
+        for tab in self.tabs.values():
             tab.close_event()
         Gtk.main_quit()
 
