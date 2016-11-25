@@ -42,11 +42,9 @@ class BrowserTab(IpcListener):
         self.universe = Universe(self)
         IpcListener.__init__(self, self.universe.ipc)
         self.tab_store = self.browser.tab_store
-        #self.tree_iter = self.tab_store.append(None, [self.title, self.uuid])
         self.tree_iter = self.tab_store.append(None, [self.title])
-
+        
         self.navigate_to(url)
-        #self.connect("clicked", self.activate)
 
     def navigate_to(self, url):
         self.send("NAVIGATE: %s" % url)
@@ -61,11 +59,9 @@ class BrowserTab(IpcListener):
         print "tab lost focus"
         
     def close_event(self, *args, **kargs):
-        print "Closing tab:", self.url
         self.universe.destroy()
 
     def attach_event(self, plug_id):
-        print "Attach:", plug_id
         self.socket.add_id(int(plug_id))
 
     def title_changed_event(self, new_title):
@@ -107,7 +103,7 @@ class BrowserWindow(object):
         renderer = Gtk.CellRendererText()
         column = Gtk.TreeViewColumn("Tab Title", renderer, text=0)
         self.tab_tree_view.append_column(column)
-        #self.tab_tree_view.connect("row_activated", self.tree_activates_tab)
+        self.tab_tree_view.connect("row_activated", self.tree_activates_tab)
 
         # self.views tracks all of the sockets
         self.views = builder.get_object("ViewPorts")
@@ -119,10 +115,11 @@ class BrowserWindow(object):
         self.new_tab("http://duckduckgo.com")
 
     def tree_activates_tab(self, tree_view, path, column):
-        tree_iter = self.tab_store.get_iter(path)
-        uuid = self.tab_store.get_value(tree_iter)
-        tab = self.tabs[uuid]
-        self.focus_tab(tab)
+        print "tree activates tab"
+        # tree_iter = self.tab_store.get_iter(path)
+        # uuid = self.tab_store.get_value(tree_iter)
+        # tab = self.tabs[uuid]
+        # self.focus_tab(tab)
 
     def focus_tab(self, tab):
         if self.focused:
