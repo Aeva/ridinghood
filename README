@@ -1,26 +1,28 @@
 
-Word of caution: this software doesn't work yet.
+Word of caution: this software kind of works, but it's pretty alpha at
+the moment.
 
 ----------------------------------------------------------------------
 
-Ridinghood is an experimental web browser that provides reasonably
-privacy from common tracking employed by for-profit corporations.
+Ridinghood is an experimental web browser that aims to provide
+reasonable privacy from common tracking methods employed by for-profit
+corporations.
 
 A big inspiration is this blog post:
 https://theperplexingpariah.co.uk/my-firefox.html
 
-Having used things like request block and self destructing cookies in
+Having used plugins like request block and self destructing cookies in
 firefox, I have some ideas for some simple changes to how the browser
 works that would aleviate a lot of the usability problems that those
 plugins have.
 
 The end goal is to have something that provides a reasonable user
-experience, but always favors safety over low learning curve.
+experience, but always favors safety over simple learning curve.
 
 The UI is probably just as important as security specifics.  It should
 make it easy to have good password hygene.  It should not train you to
-type you master password repeatedly into easily spoofed dialogue boxes
-(damn it, firefox!).
+type your master password repeatedly into easily spoofed dialogue
+boxes (damn it, firefox!).
 
 The core of this project is segmentation.  Modern web browsers share
 all sorts of data between browsing contexts that can be used to track
