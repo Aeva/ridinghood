@@ -177,11 +177,9 @@ class BrowserWindow(object):
 
     def history_back(self, *args, **kargs):
         self.focused.send("HISTORY_BACKWARD")
-        self.req_history_update()
         
     def history_forward(self, *args, **kargs):
         self.focused.send("HISTORY_FORWARD")
-        self.req_history_update()
 
     def refresh_page(self, *args, **kargs):
         print "Refresh Event"

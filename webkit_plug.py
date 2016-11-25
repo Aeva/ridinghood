@@ -68,15 +68,17 @@ class BrowserWorker(IpcListener):
     def update_history_state(self):
         data = json.dumps((
             self.webview.can_go_back(),
-            self.webview.can_go_forward(),
+            self.webview.can_go_forward()
         ))
         self.send("HISTORY_STATE: %s" % data)
 
     def history_forward(self):
         self.webview.go_forward()
+        self.update_history_state()
 
     def history_backward(self):
         self.webview.go_back()
+        self.update_history_state()
 
 if __name__ == "__main__":
     Gtk.init()
