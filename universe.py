@@ -28,6 +28,31 @@ from gi.repository import GLib
 
 
 class IpcHandler(Thread):
+    """
+    This class provides easy interprocess communication over IO
+    objects!
+
+    A child process will want to use stdin as the read pipe, and
+    stdout as the write pipe.  The parent process will want to use the
+    Popen object's stdin as the write pipe, and the Popen object's
+    stdout as the read pipe.
+
+    A method or IpcListener instance may also be passed in for the
+    signal argument so that message events may be pushed.
+
+    Currently, this depends on a GLib event loop to be present.
+
+    An instance of this class creates a new thread to use ot listen to
+    the read_pipe.  When new data is found, it is buffered so that the
+    'read' method can acces it, and optionally signal method is
+    scheduled to run on the main thread when GLib is idle again.
+
+    This class provides a "read" and "send" method, both of which are
+    non-blocking.
+
+    For Gtk applications, you will likely only use the "send" method
+    and a signal callback.
+    """
     def __init__(self, read_pipe=sys.stdin, write_pipe=sys.stdout, signal=None):
         Thread.__init__(self)
         self.__read = read_pipe
@@ -58,6 +83,10 @@ class IpcHandler(Thread):
             time.sleep(0.01)
     
     def send(self, packet):
+        """
+        Sends a "packet" to the other process.  Right now, a packet is
+        just a line of ascii encoded text.
+        """
         if type(packet) is str:
             self.__write.write(packet.strip() + "\n")
             self.__write.flush()
@@ -67,6 +96,9 @@ class IpcHandler(Thread):
             raise NotImplementedError("sending arbitrary objects via json")
 
     def read(self):
+        "
+        Returns a list of new data from the other process.
+        "
         data = None
         if self.__ready.wait(0.01):
             self.__lock.acquire()
@@ -77,6 +109,17 @@ class IpcHandler(Thread):
 
     
 class IpcListener(object):
+    """
+    The IpcListener class provides event routing on top of the
+    functionality defined by IpcHandler.  To use this, a derrived
+    class should define a dictionary as the "_event_routing" member
+    variable.  The keys in the dictionary should be regular
+    expressions, the values are method names on the class.  Any name
+    groups in the regex are in turn used as named parameters on the
+    event callback.
+
+    See BrowserTab as an example of how to use this.
+    """
     _event_routing = {}
 
     def __init__(self, ipc):
@@ -99,6 +142,18 @@ class IpcListener(object):
 
 
 class Universe(object):
+    """
+    This class is used by the browser frontend to create universe
+    subprocesses, which encapsulate a clean browsing context.
+
+    This also provides an IpcHandler to communicate with the
+    subprocess.
+
+    It is expected that whatever creates this class derrives from
+    IpcListener, and attaches to the IpcHandler instance on this, so
+    that automatic event routing can be performed.
+    """
+
     __next_universe__ = 1
     __active_universes__ = {}
 
