@@ -26,6 +26,15 @@ from universe import IpcHandler, IpcListener
 
 
 class BrowserWorker(IpcListener):
+    """
+    This class runs in a subprocess of the browser and provides a
+    webkit instance / "universe".
+
+    This class is pretty much boilerplate code for connecting the
+    webkit instance to the frontend via the IPC framework defined in
+    universe.py.
+    """
+
     _event_routing = {
         r'^NAVIGATE: (?P<uri>.*)$': "navigate_event",
         r'^REQ_HISTORY$' : "update_history_state",
