@@ -99,13 +99,24 @@ class IpcListener(object):
 
 
 class Universe(object):
+    __next_universe__ = 1
+    __active_universes__ = {}
+
     def __init__(self, tab):
+        self.universe_id = str(Universe.__next_universe__)
+        Universe.__next_universe__ += 1
+        Universe.__active_universes__[self.universe_id] = self
+
         args_list = ["python", "webkit_plug.py", tab.url]
         self.proc = subprocess.Popen(
             args_list, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.ipc = IpcHandler(self.proc.stdout, self.proc.stdin, tab)
+
+    def __repr__(self):
+        return "EARTH %s" % self.universe_id
         
     def destroy(self):
-        print "Destroying universe"
+        print "Destroying universe: %s" % self.__repr__()
+        Universe.__active_universes__.pop(self.universe_id)
         self.proc.kill()
         self.ipc.alive = False

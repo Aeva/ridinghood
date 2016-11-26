@@ -38,13 +38,28 @@ class BrowserTab(IpcListener):
         self.url = url
         self.title = "New Tab"
         self.browser = browser
-        self.socket = Gtk.Socket()
         self.universe = Universe(self)
         IpcListener.__init__(self, self.universe.ipc)
-        self.tab_store = self.browser.tab_store
-        self.tree_iter = self.tab_store.append(None, [self.title, self.uuid])
-        
+        self.init_ui_elements()
         self.navigate_to(url)
+
+    def init_ui_elements(self):
+        self.socket = Gtk.Socket()
+        self.tab_store = self.browser.tab_store
+
+        if not hasattr(self.universe, "tree_iter"):
+            uni_row = [
+                self.universe.__repr__(),
+                str(self.universe.universe_id),
+            ]
+            self.universe.tree_iter = self.tab_store.append(None, uni_row)
+
+        tab_row = [self.title, self.uuid]
+        self.tree_iter = self.tab_store.append(self.universe.tree_iter, tab_row)
+
+        uni_path = self.tab_store.get_path(self.universe.tree_iter)
+        tree_view = self.browser.tab_tree_view
+        tree_view.expand_row(uni_path, True)
 
     def navigate_to(self, url):
         self.send("NAVIGATE: %s" % url)
@@ -118,9 +133,15 @@ class BrowserWindow(object):
 
     def tree_activates_tab(self, tree_view, path, column):
         tree_iter = self.tab_store.get_iter(path)
-        uuid = self.tab_store.get_value(tree_iter, 1)
-        tab = self.tabs[uuid]
-        self.focus_tab(tab, False)
+        tab_id = self.tab_store.get_value(tree_iter, 1)
+
+        if self.tabs.has_key(tab_id):
+            tab = self.tabs[tab_id]
+            self.focus_tab(tab, False)
+
+        elif Universe.__active_universes__.has_key(tab_id):
+            universe = Universe.__active_universes__[tab_id]
+            print "User selected universe tab: %s" % universe.universe_id
 
     def focus_tab(self, tab, update_highlight=True):
         if self.focused:
