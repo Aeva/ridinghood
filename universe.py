@@ -96,9 +96,9 @@ class IpcHandler(Thread):
             raise NotImplementedError("sending arbitrary objects via json")
 
     def read(self):
-        "
+        """
         Returns a list of new data from the other process.
-        "
+        """
         data = None
         if self.__ready.wait(0.01):
             self.__lock.acquire()
