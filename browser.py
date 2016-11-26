@@ -17,14 +17,44 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import re
 import json
 import uuid
+
+from urlparse import urlsplit, urlunsplit
 
 import gi
 from gi.repository import Gtk, GObject
 from universe import Universe, IpcListener
 
-    
+
+def validate_url(in_url):
+    """
+    Take some value provided by the user and attempt to produce a
+    meaningful url from it.
+    """
+    parts = list(urlsplit(in_url))
+    scheme = parts[0]
+    netloc = parts[1]
+    path = parts[2]
+
+    if not netloc:
+        tld_regex = r'^\S+\.\S+$'
+        if re.match(tld_regex, in_url):
+            return validate_url("https://%s" % in_url)
+        else:
+            return validate_url("https://en.wikipedia.org/wiki/%s" % in_url)
+    return urlunsplit(parts)
+
+
+def url_domain(url):
+    """
+    Return the two top-most domains from a given url.
+    """
+    parts = urlsplit(url)
+    return ".".join(parts.netloc.split(".")[-2:])
+
+
 class BrowserTab(IpcListener):
     """
     This class represents a browser tab.  It is mostly boilerplate for
@@ -338,9 +368,14 @@ class BrowserWindow(object):
         Event handler, triggerd by pressing enter in the url bar.  This
         attempts to navigate to a new page.
         """
-        new_url = self.url_bar.get_text()
-        self.focused.navigate_to(new_url)
-        self.viewport_grab_focus()
+        new_url = validate_url(self.url_bar.get_text())
+        new_domain = url_domain(new_url)
+        old_domain = url_domain(self.focused.url)
+        if new_domain == old_domain:
+            self.focused.navigate_to(new_url)
+            self.viewport_grab_focus()
+        else:
+            self.new_tab(new_url)
 
     def url_bar_gains_focus(self, *args, **kargs):
         """
