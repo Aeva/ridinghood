@@ -235,10 +235,10 @@ class BrowserWindow(object):
         This method ensures 'tab_id' is the newest item in the list.
         """
         try:
-            self.focus_history.remove(tab.uuid)
+            self.focus_history.remove(tab_id)
         except ValueError:
             pass
-        self.focus_history.append(tab.uuid)
+        self.focus_history.append(tab_id)
 
     def lookup_id(self, mystery_id):
         """
