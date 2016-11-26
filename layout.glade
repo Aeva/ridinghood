@@ -305,6 +305,7 @@
                         <property name="search_column">1</property>
                         <property name="enable_tree_lines">True</property>
                         <property name="tooltip_column">0</property>
+                        <signal name="button-press-event" handler="tab_tree_button_press_event" swapped="no"/>
                       </object>
                     </child>
                   </object>

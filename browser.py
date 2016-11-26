@@ -101,7 +101,7 @@ class BrowserTab(IpcListener):
         Event handler for when the tab loses focus.
         """
         pass
-        
+
     def close_event(self, *args, **kargs):
         """
         Event handler for when the program is trying to quit.  This
@@ -143,6 +143,33 @@ class BrowserTab(IpcListener):
         """
         self.browser.url_bar.set_text(uri)
 
+
+class TabContextMenu(object):
+    """
+    This class represents the popup context menu that appears when you
+    right click on a browser ui tab.  Only one instance is needed by
+    the BrowserWindow, since the menu is the same for each one.
+    """
+    def __init__(self, browser):
+        self.browser = browser
+        self.tab = None
+        
+        self.menu = Gtk.Menu()
+        close_item = Gtk.MenuItem("Close Tab")
+        close_item.connect("activate", self.on_close)
+        self.menu.append(close_item)
+
+    def on_close(self, *args, **kargs):
+        """
+        Signals that the tab should be closed.
+        """
+        self.browser.close_tab(self.tab)
+
+    def __call__(self, tab):
+        self.tab = tab
+        self.menu.show_all()
+        self.menu.popup(None, None, None, None, 0, Gtk.get_current_event_time())
+
         
 class BrowserWindow(object):
     """
@@ -168,12 +195,18 @@ class BrowserWindow(object):
         self.history_forward = builder.get_object("HistoryForward")
         self.history_backward = builder.get_object("HistoryBackward")
 
+        # create popup menu for browser tabs
+        self.tab_menu = TabContextMenu(self)
+
         # tabs tracks the open BrowserTab objects
         self.tabs = {}
         self.focused = None
         self.tab_store = builder.get_object("TabTreeStore")
         self.tab_tree_view = builder.get_object("TabTreeView")
         self.tab_tree_view.set_activate_on_single_click(True)
+
+        # stores a list of tab ID's, in order of call
+        self.focus_history = []
 
         # setup the treeview's renderer
         renderer = Gtk.CellRendererText()
@@ -191,22 +224,67 @@ class BrowserWindow(object):
         self.new_tab("http://pirateradiotheater.org")
         self.new_tab("http://duckduckgo.com")
 
+    def push_focus_history(self, tab_id):
+        """
+        The focus_history list contains BrowserTab IDs, should contain no
+        repeat entries, and is ordered from oldest to newest.
+
+        When a browser tab is closed, this list is used to determine
+        what should be focused next.
+
+        This method ensures 'tab_id' is the newest item in the list.
+        """
+        try:
+            self.focus_history.remove(tab.uuid)
+        except ValueError:
+            pass
+        self.focus_history.append(tab.uuid)
+
+    def lookup_id(self, mystery_id):
+        """
+        This method returns one of the following objects for a given ID value:
+         - a BrowserTab instance
+         - a Universe instance
+         - None
+        """
+        universes = Universe.__active_universes__
+        return self.tabs.get(mystery_id) or universes.get(mystery_id)
+
     def tree_activates_tab(self, tree_view, path, column):
         """
         Event handler, which is triggerd by the TreeView, when the user
         clicks on a row.
         """
         tree_iter = self.tab_store.get_iter(path)
-        tab_id = self.tab_store.get_value(tree_iter, 1)
+        mystery_id = self.tab_store.get_value(tree_iter, 1)
+        thing = self.lookup_id(mystery_id)
 
-        if self.tabs.has_key(tab_id):
-            tab = self.tabs[tab_id]
-            self.focus_tab(tab, False)
+        if type(thing) is BrowserTab:
+            self.focus_tab(thing, False)
             self.viewport_grab_focus()
 
-        elif Universe.__active_universes__.has_key(tab_id):
-            universe = Universe.__active_universes__[tab_id]
-            print "User selected universe tab: %s" % universe.universe_id
+        elif type(thing) is Universe:
+            print "User selected universe tab: %s" % thing.universe_id
+
+    def tab_tree_button_press_event(self, caller, event_info):
+        """
+        Event handler which is connected to the button-press event on the
+        tabs TreeView object.
+
+        This is used to show a context menue when a right click happens.
+        """
+        button = event_info.get_button()[1]
+        if button == 3:
+            # right click
+            path = self.tab_tree_view.get_path_at_pos(event_info.x, event_info.y)[0]
+            iter = self.tab_store.get_iter(path)
+            mystery_id = self.tab_store.get_value(iter, 1)
+            thing = self.lookup_id(mystery_id)
+            if type(thing) is BrowserTab:
+                self.tab_menu(thing)
+
+            elif type(thing) is Universe:
+                pass
 
     def viewport_grab_focus(self):
         """
@@ -241,6 +319,7 @@ class BrowserWindow(object):
             path = self.tab_store.get_path(tab.tree_iter)
             selector = self.tab_tree_view.get_selection()
             selector.select_path(path)
+        self.push_focus_history(tab.uuid)
 
     def new_tab(self, uri="about:blank"):
         """
@@ -252,6 +331,7 @@ class BrowserWindow(object):
         self.views.pack_start(tab.socket, True, True, 0)
         self.focus_tab(tab)
         self.viewport_grab_focus()
+        self.push_focus_history(tab.uuid)
 
     def open_url_event(self, *args, **kargs):
         """
@@ -305,6 +385,27 @@ class BrowserWindow(object):
         Refresh the current page.
         """
         self.focused.send("RELOAD")
+
+    def close_tab(self, tab):
+        """
+        Close a tab, and possibly also the universe it belongs to.
+        """
+        tab_id = tab.uuid
+        tab_iter = tab.tree_iter
+        universe_id = tab.universe.universe_id
+        universe_iter = tab.universe.tree_iter
+        tab.close_event()
+        self.tabs.pop(tab_id)
+        self.tab_store.remove(tab_iter)
+        self.tab_store.remove(universe_iter)
+        self.focus_history.remove(tab_id)
+        if self.focus_history:
+            new_tab_id = self.focus_history[-1]
+            new_tab = self.lookup_id(new_tab_id)
+            self.focus_tab(new_tab)
+        else:
+            # no tabs left, so close the browser
+            self.shutdown_event()
 
     def shutdown_event(self, *args, **kargs):
         """
