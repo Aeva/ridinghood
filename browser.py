@@ -42,6 +42,8 @@ def validate_url(in_url):
         tld_regex = r'^\S+\.\S+$'
         if re.match(tld_regex, in_url):
             return validate_url("https://%s" % in_url)
+        elif in_url == "about:blank":
+            return in_url
         else:
             return validate_url("https://en.wikipedia.org/wiki/%s" % in_url)
     return urlunsplit(parts)
@@ -415,7 +417,7 @@ class BrowserWindow(object):
         self.focus_tab(tab)
         self.viewport_grab_focus()
         self.push_focus_history(tab.uuid)
-        return tab
+        self.url_bar.set_text(uri)
 
     def open_url_event(self, *args, **kargs):
         """
@@ -425,11 +427,12 @@ class BrowserWindow(object):
         new_url = validate_url(self.url_bar.get_text())
         new_domain = url_domain(new_url)
         old_domain = url_domain(self.focused.url)
-        if new_domain == old_domain and old_domain != "about:blank":
+        if new_domain == old_domain or self.focused.url == "about:blank":
             self.focused.navigate_to(new_url)
             self.viewport_grab_focus()
         else:
             self.new_tab(new_url)
+        self.url_bar.set_text(new_url)
 
     def url_bar_gains_focus(self, *args, **kargs):
         """
