@@ -58,14 +58,8 @@ def url_domain(url):
 class BrowserTab(object):
     """
     This class represents a browser tab.  It is mostly boilerplate for
-    event routing.
-
-    It is mainly responsible for the creation and communication with
-    browsing Universes, and the corresponding Socket object.
-
-    This currently assumes a 1:1 relationship with Universe objects,
-    so some future refactoring will be needed to enable multiple tabs
-    in the same universe.
+    event routing.  It is also responsible for tracking the Socket
+    object needed to display the browser tab.
     """
     
     def __init__(self, browser, url, universe):
@@ -105,6 +99,9 @@ class BrowserTab(object):
 
     def send(self, action, **packet):
         """
+        Wrapper to send a message to the BrowserWorker instance that
+        corresponds to this BrowserTab instance.  This automatically
+        populates the 'target' field of the packet.
         """
         self.universe.send(action, target=self.uuid, **packet)
         

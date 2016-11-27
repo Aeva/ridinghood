@@ -161,12 +161,11 @@ class Universe(IpcListener):
     This class is used by the browser frontend to create universe
     subprocesses, which encapsulate a clean browsing context.
 
-    This also provides an IpcHandler to communicate with the
-    subprocess.
+    This also doubles up as a IpcListener instance to provide event
+    routing stuff.
 
-    It is expected that whatever creates this class derrives from
-    IpcListener, and attaches to the IpcHandler instance on this, so
-    that automatic event routing can be performed.
+    Use the 'register' method to attach objects to the event routing
+    system.
     """
 
     __next_universe__ = 1

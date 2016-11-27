@@ -27,12 +27,8 @@ from universe import IpcHandler, IpcListener
 
 class BrowserWorker(object):
     """
-    This class runs in a subprocess of the browser and provides a
-    webkit instance / "universe".
-
-    This class is pretty much boilerplate code for connecting the
-    webkit instance to the frontend via the IPC framework defined in
-    universe.py.
+    This class encapsulates the WebKit.WebView instance corresponding
+    to a browser tab.  It is primarily event listeners.
     """
 
     def __init__(self, tracker, url, tab_id):
@@ -60,6 +56,9 @@ class BrowserWorker(object):
 
     def send(self, action, **packet):
         """
+        Wrapper to send a message to the BrowserTab instance that
+        corresponds to this BrowserWorker instance.  This
+        automatically populates the 'target' field of the packet.
         """
         self.tracker.send(action, target=self.uuid, **packet)
 
@@ -95,6 +94,11 @@ class BrowserWorker(object):
 
 
 class UniverseTracker(IpcListener):
+    """
+    The UniverseTracker is responsible for routing events between
+    BrowserTab instances and their corresponding BrowserWorker
+    instances.
+    """
     def __init__(self):
         IpcListener.__init__(self, IpcHandler(signal=self))
         
