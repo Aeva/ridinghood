@@ -24,7 +24,7 @@ import uuid
 from urlparse import urlsplit, urlunsplit
 
 import gi
-from gi.repository import Gtk, GObject, GLib
+from gi.repository import Gtk, GObject
 from universe import Universe, IpcListener
 
 
@@ -134,7 +134,9 @@ class BrowserTab(object):
         Event handler for when the program is trying to quit.  This
         triggers the browser universe to tear down.
         """
-        self.universe.destroy()
+        self.universe.remove(self.uuid)
+        if not self.universe.actors:
+            self.universe.destroy()
 
     def attach_event(self, plug_id):
         """
@@ -198,6 +200,44 @@ class TabContextMenu(object):
         self.menu.show_all()
         self.menu.popup(None, None, None, None, 0, Gtk.get_current_event_time())
 
+class UniverseContextMenu(object):
+    """
+    This class represents the popup context menu that appears when you
+    right click on a browser ui tab.  Only one instance is needed by
+    the BrowserWindow, since the menu is the same for each one.
+    """
+    def __init__(self, browser):
+        self.browser = browser
+        self.universe = None
+        self.menu = Gtk.Menu()
+        self.add_item("New Tab", self.on_new_tab)
+        self.add_item("Destroy Universe", self.on_close)
+
+    def add_item(self, name, handler):
+        """
+        Add a new menu item.
+        """
+        item = Gtk.MenuItem(name)
+        item.connect("activate", handler)
+        self.menu.append(item)
+
+    def on_new_tab(self, *args, **kargs):
+        """
+        Signals the creation of a new tab in-universe.
+        """
+        self.browser.new_tab("about:blank", self.universe)
+
+    def on_close(self, *args, **kargs):
+        """
+        Signals that the tab should be closed.
+        """
+        self.browser.close_universe(self.universe)
+
+    def __call__(self, universe):
+        self.universe = universe
+        self.menu.show_all()
+        self.menu.popup(None, None, None, None, 0, Gtk.get_current_event_time())
+
         
 class BrowserWindow(object):
     """
@@ -225,6 +265,7 @@ class BrowserWindow(object):
 
         # create popup menu for browser tabs
         self.tab_menu = TabContextMenu(self)
+        self.uni_menu = UniverseContextMenu(self)
 
         # tabs tracks the open BrowserTab objects
         self.tabs = {}
@@ -249,7 +290,6 @@ class BrowserWindow(object):
         window.show_all()
         
         # create a new tab
-        self.new_tab("http://pirateradiotheater.org")
         self.new_tab("http://duckduckgo.com")
 
     def push_focus_history(self, tab_id):
@@ -312,7 +352,7 @@ class BrowserWindow(object):
                 self.tab_menu(thing)
 
             elif type(thing) is Universe:
-                pass
+                self.uni_menu(thing)
 
     def viewport_grab_focus(self):
         """
@@ -338,7 +378,6 @@ class BrowserWindow(object):
         if self.focused:
             self.focused.mute()
             self.focused.socket.hide()
-
         self.focused = tab
         tab.focus()
         tab.socket.show()
@@ -363,6 +402,7 @@ class BrowserWindow(object):
         self.focus_tab(tab)
         self.viewport_grab_focus()
         self.push_focus_history(tab.uuid)
+        return tab
 
     def open_url_event(self, *args, **kargs):
         """
@@ -372,7 +412,7 @@ class BrowserWindow(object):
         new_url = validate_url(self.url_bar.get_text())
         new_domain = url_domain(new_url)
         old_domain = url_domain(self.focused.url)
-        if new_domain == old_domain:
+        if new_domain == old_domain and old_domain != "about:blank":
             self.focused.navigate_to(new_url)
             self.viewport_grab_focus()
         else:
@@ -428,9 +468,13 @@ class BrowserWindow(object):
         if self.focus_history:
             new_tab_id = self.focus_history[-1]
             new_tab = self.lookup_id(new_tab_id)
+            if self.focused == tab:
+                self.focused = None
+            print "focus new tab"
             self.focus_tab(new_tab)
         else:
             # no tabs left, so close the browser
+            print "shutdown event?"
             self.shutdown_event()
 
     def shutdown_event(self, *args, **kargs):
@@ -446,9 +490,4 @@ class BrowserWindow(object):
 if __name__ == "__main__":
     Gtk.init()
     browser = BrowserWindow()
-    try:
-        # using this instead of Gtk.main() so we can catch the
-        # KeyboardInterrupt event.
-        GLib.MainLoop().run()
-    except KeyboardInterrupt:
-        browser.shutdown_event()
+    Gtk.main()

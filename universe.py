@@ -132,6 +132,12 @@ class IpcListener(object):
     def register(self, route_id, instance):
         self.actors[route_id] = instance
 
+    def remove(self, route_id):
+        try:
+            self.actors.pop(route_id)
+        except KeyError:
+            pass
+
     def send(self, action, **kargs):
         self._ipc.send(action, **kargs)
                 
@@ -186,7 +192,8 @@ class Universe(IpcListener):
         return "EARTH %s" % self.universe_id
         
     def destroy(self):
-        print "Destroying universe: %s" % self.__repr__()
-        Universe.__active_universes__.pop(self.universe_id)
-        self.proc.kill()
-        self.ipc.alive = False
+        if self.ipc.alive:
+            print "Destroying universe: %s" % self.__repr__()
+            Universe.__active_universes__.pop(self.universe_id)
+            self.proc.kill()
+            self.ipc.alive = False
