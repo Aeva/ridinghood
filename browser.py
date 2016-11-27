@@ -82,22 +82,23 @@ class BrowserTab(object):
         self.socket.set_can_focus(True)
 
         # add universe tab to tree, if applicable:
-        self.tab_store = self.browser.tab_store
-        if not hasattr(self.universe, "tree_iter"):
+        tab_store = self.browser.tab_store
+        uni_id = self.universe.universe_id
+        uni_iter = self.browser.find_tree_iter(uni_id)
+        if not uni_iter:
             uni_row = [
                 self.universe.__repr__(),
-                str(self.universe.universe_id),
+                str(uni_id),
             ]
-            self.universe.tree_iter = self.tab_store.append(None, uni_row)
+            uni_iter = tab_store.append(None, uni_row)
 
         # add browser tab to tree:
         tab_row = [self.title, self.uuid]
-        self.tree_iter = self.tab_store.append(self.universe.tree_iter, tab_row)
+        tree_iter = tab_store.append(uni_iter, tab_row)
 
         # expand universe row:
-        uni_path = self.tab_store.get_path(self.universe.tree_iter)
-        tree_view = self.browser.tab_tree_view
-        tree_view.expand_row(uni_path, True)
+        uni_path = tab_store.get_path(uni_iter)
+        self.browser.tab_tree_view.expand_row(uni_path, True)
 
     def send(self, action, **packet):
         """
@@ -165,7 +166,9 @@ class BrowserTab(object):
         Event handler for when the title of the open web page changes.
         """
         self.title = new_title
-        self.tab_store[self.tree_iter][0] = self.title
+        tree_iter = self.browser.find_tree_iter(self.uuid)
+        if tree_iter:
+            self.browser.tab_store[tree_iter][0] = self.title
 
     def request_history_state(self):
         """
@@ -400,9 +403,11 @@ class BrowserWindow(object):
         tab.socket.show()
         self.req_history_update()
         if update_highlight:
-            path = self.tab_store.get_path(tab.tree_iter)
-            selector = self.tab_tree_view.get_selection()
-            selector.select_path(path)
+            iter = self.find_tree_iter(tab.uuid)
+            if iter:
+                path = self.tab_store.get_path(iter)
+                selector = self.tab_tree_view.get_selection()
+                selector.select_path(path)
         self.push_focus_history(tab.uuid)
 
     def new_tab(self, uri="about:blank", universe=None):
@@ -420,6 +425,20 @@ class BrowserWindow(object):
         self.viewport_grab_focus()
         self.push_focus_history(tab.uuid)
         self.url_bar.set_text(uri)
+
+    def find_tree_iter(self, thing_id, search=None):
+        """
+        Returns either None or the GtkTreeIter object associated to the
+        provided object ID present in the tab bar.
+        """
+        for row in search or self.tab_store:
+            row_id = self.tab_store.get_value(row.iter, 1)
+            if str(thing_id) == row_id:
+                return row.iter
+            else:
+                found = self.find_tree_iter(thing_id, row.iterchildren())
+                if found:
+                    return found
 
     def open_url_event(self, *args, **kargs):
         """
@@ -485,10 +504,8 @@ class BrowserWindow(object):
 
         # store some handy values
         tab_id = tab.uuid
-        tab_iter = tab.tree_iter
         universe = tab.universe
         universe_id = universe.universe_id
-        universe_iter = universe.tree_iter
         shutdown = False
         
         # focus a new tab
@@ -506,10 +523,15 @@ class BrowserWindow(object):
         else:
             tab.clean_up()
         self.tabs.pop(tab_id)
-        self.tab_store.remove(tab_iter)
+
+        tab_iter = self.find_tree_iter(tab_id)
+        if tab_iter:
+            self.tab_store.remove(tab_iter)
         if not universe.actors:
             # and also the old universe
-            self.tab_store.remove(universe_iter)
+            universe_iter = self.find_tree_iter(universe_id)
+            if universe_iter:
+                self.tab_store.remove(universe_iter)
 
         # and shut down if there are no other tabs
         if shutdown:
