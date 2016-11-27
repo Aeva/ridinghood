@@ -86,20 +86,24 @@ class IpcHandler(Thread):
         Sends a "packet" to the other process.  Right now, a packet is
         just a line of ascii encoded text.
         """
-        packet = "JSON:" + json.dumps({
-            "action" : action,
-            "kargs" : kargs,
-        }).strip().replace("\n", chr(31))
-        
-        self.__write.write(packet + "\n")
-        self.__write.flush()
+        if self.alive:
+            packet = "JSON:" + json.dumps({
+                "action" : action,
+                "kargs" : kargs,
+            }).strip().replace("\n", chr(31))
+
+            self.__write.write(packet + "\n")
+            try:
+                self.__write.flush()
+            except IOError:
+                self.alive = False
 
     def read(self):
         """
         Returns a list of new data from the other process.
         """
         data = []
-        if self.__ready.wait(0.01):
+        if self.alive and self.__ready.wait(0.01):
             self.__lock.acquire()
             while self.__new_data:
                 raw = self.__new_data.pop(0)
@@ -126,7 +130,7 @@ class IpcListener(object):
     """
 
     def __init__(self, ipc):
-        self._ipc = ipc
+        self.ipc = ipc
         self.actors = {}
 
     def register(self, route_id, instance):
@@ -139,10 +143,11 @@ class IpcListener(object):
             pass
 
     def send(self, action, **kargs):
-        self._ipc.send(action, **kargs)
+        if self.ipc.alive:
+            self.ipc.send(action, **kargs)
                 
     def routing_event(self):
-        for packet in self._ipc.read():
+        for packet in self.ipc.read():
             handled = False
             if type(packet) is str:
                 sys.stderr.write(packet + "\n")
@@ -197,7 +202,8 @@ class Universe(IpcListener):
         
     def destroy(self):
         if self.ipc.alive:
+            self.ipc.alive = False
             print "Destroying universe: %s" % self.__repr__()
             Universe.__active_universes__.pop(self.universe_id)
             self.proc.kill()
-            self.ipc.alive = False
+            self.actors = []

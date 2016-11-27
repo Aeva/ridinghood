@@ -135,11 +135,19 @@ class BrowserTab(object):
         triggers the browser universe to tear down.
         """
         self.send("teardown")
-        self.socket.get_parent().remove(self.socket)
-        self.socket.destroy()
         self.universe.remove(self.uuid)
         if not self.universe.actors:
             self.universe.destroy()
+        self.clean_up()
+
+    def clean_up(self):
+        """
+        Assumes the connection with the universe has been terminated.
+        Clean up whatever is left on this object.  Calling close_event
+        implies this.
+        """
+        self.browser.views.remove(self.socket)
+        self.socket.destroy()
 
     def attach_event(self, plug_id):
         """
@@ -457,6 +465,15 @@ class BrowserWindow(object):
         """
         self.focused.send("reload")
 
+    def close_universe(self, universe):
+        """
+        Close all of the tabs in a given universe.
+        """
+        tabs = universe.actors.values()
+        universe.destroy()
+        for tab in tabs:
+            self.close_tab(tab)
+
     def close_tab(self, tab):
         """
         Close a tab, and possibly also the universe it belongs to.
@@ -480,7 +497,10 @@ class BrowserWindow(object):
             shutdown = True
 
         # tear down the old tab
-        tab.close_event()
+        if universe.ipc.alive:
+            tab.close_event()
+        else:
+            tab.clean_up()
         self.tabs.pop(tab_id)
         self.tab_store.remove(tab_iter)
         if not universe.actors:
