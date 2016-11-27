@@ -97,6 +97,8 @@ class IpcHandler(Thread):
                 self.__write.flush()
             except IOError:
                 self.alive = False
+                sys.stderr.write(
+                    "IpcHandler shutdown due to IOError on pipe flush.\n")
 
     def read(self):
         """
