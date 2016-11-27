@@ -32,6 +32,7 @@ class BrowserWorker(object):
     """
 
     def __init__(self, tracker, url, tab_id):
+        self.alive = True
         self.tracker = tracker
         self.uuid = tab_id
         self.plug = Gtk.Plug()
@@ -60,7 +61,8 @@ class BrowserWorker(object):
         corresponds to this BrowserWorker instance.  This
         automatically populates the 'target' field of the packet.
         """
-        self.tracker.send(action, target=self.uuid, **packet)
+        if self.alive:
+            self.tracker.send(action, target=self.uuid, **packet)
 
     def load_start_event(self, *args, **kargs):
         uri = self.webview.get_uri()
@@ -91,6 +93,11 @@ class BrowserWorker(object):
 
     def reload(self):
         self.webview.reload()
+
+    def teardown(self):
+        self.alive = False
+        self.tracker.remove(self.uuid)
+        self.plug.destroy()
 
 
 class UniverseTracker(IpcListener):

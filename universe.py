@@ -148,18 +148,22 @@ class IpcListener(object):
                 sys.stderr.write(packet + "\n")
 
             elif type(packet) is dict:
-                action = packet["action"]
-                kargs = packet["kargs"]
-                if hasattr(self, action):
-                    self.__getattribute__(action)(**kargs)
-                else:
-                    target = self.actors.get(kargs.get("target"))
-                    if target and hasattr(target, action):
-                        kargs.pop("target")
-                        target.__getattribute__(action)(**kargs)
+                action = packet.get('action')
+                kargs = packet.get('kargs')
+                if action and kargs:
+                    if hasattr(self, action):
+                        self.__getattribute__(action)(**kargs)
                     else:
-                        sys.stderr.write(
-                            "No handler found: %s" % packet.action)
+                        target = self.actors.get(kargs.get("target"))
+                        if target and hasattr(target, action):
+                            kargs.pop("target")
+                            target.__getattribute__(action)(**kargs)
+                        else:
+                            sys.stderr.write(
+                                "No handler found: %s\n" % action)
+                else:
+                    sys.stderr.write(
+                        "Malformed packet: %s\n" % packet)
 
 
 class Universe(IpcListener):

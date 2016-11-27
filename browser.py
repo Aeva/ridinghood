@@ -134,6 +134,9 @@ class BrowserTab(object):
         Event handler for when the program is trying to quit.  This
         triggers the browser universe to tear down.
         """
+        self.send("teardown")
+        self.socket.get_parent().remove(self.socket)
+        self.socket.destroy()
         self.universe.remove(self.uuid)
         if not self.universe.actors:
             self.universe.destroy()
@@ -344,8 +347,10 @@ class BrowserWindow(object):
         button = event_info.get_button()[1]
         if button == 3:
             # right click
-            path = self.tab_tree_view.get_path_at_pos(event_info.x, event_info.y)[0]
-            iter = self.tab_store.get_iter(path)
+            found = self.tab_tree_view.get_path_at_pos(event_info.x, event_info.y)
+            if not found:
+                return
+            iter = self.tab_store.get_iter(found[0])
             mystery_id = self.tab_store.get_value(iter, 1)
             thing = self.lookup_id(mystery_id)
             if type(thing) is BrowserTab:
@@ -456,23 +461,34 @@ class BrowserWindow(object):
         """
         Close a tab, and possibly also the universe it belongs to.
         """
+
+        # store some handy values
         tab_id = tab.uuid
         tab_iter = tab.tree_iter
-        universe_id = tab.universe.universe_id
-        universe_iter = tab.universe.tree_iter
-        tab.close_event()
-        self.tabs.pop(tab_id)
-        self.tab_store.remove(tab_iter)
-        self.tab_store.remove(universe_iter)
+        universe = tab.universe
+        universe_id = universe.universe_id
+        universe_iter = universe.tree_iter
+        shutdown = False
+        
+        # focus a new tab
         self.focus_history.remove(tab_id)
         if self.focus_history:
             new_tab_id = self.focus_history[-1]
             new_tab = self.lookup_id(new_tab_id)
-            if self.focused == tab:
-                self.focused = None
-            print "focus new tab"
             self.focus_tab(new_tab)
         else:
+            shutdown = True
+
+        # tear down the old tab
+        tab.close_event()
+        self.tabs.pop(tab_id)
+        self.tab_store.remove(tab_iter)
+        if not universe.actors:
+            # and also the old universe
+            self.tab_store.remove(universe_iter)
+
+        # and shut down if there are no other tabs
+        if shutdown:
             # no tabs left, so close the browser
             print "shutdown event?"
             self.shutdown_event()
