@@ -409,6 +409,7 @@ class BrowserWindow(object):
                 selector = self.tab_tree_view.get_selection()
                 selector.select_path(path)
         self.push_focus_history(tab.uuid)
+        self.url_bar.set_text(tab.url)
 
     def new_tab(self, uri="about:blank", universe=None):
         """
