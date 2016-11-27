@@ -25,7 +25,7 @@ from gi.repository import WebKit, Gtk, GObject
 from universe import IpcHandler, IpcListener
 
 
-class BrowserWorker(IpcListener):
+class BrowserWorker(object):
     """
     This class runs in a subprocess of the browser and provides a
     webkit instance / "universe".
@@ -35,17 +35,9 @@ class BrowserWorker(IpcListener):
     universe.py.
     """
 
-    _event_routing = {
-        r'^NAVIGATE: (?P<uri>.*)$': "navigate_event",
-        r'^REQ_HISTORY$' : "update_history_state",
-        r'^HISTORY_FORWARD$' : "history_forward",
-        r'^HISTORY_BACKWARD$' : "history_backward",
-        r'^RELOAD$' : "reload",
-    }
-
-    def __init__(self):
-        IpcListener.__init__(self, IpcHandler(signal=self))
-        
+    def __init__(self, tracker, url, tab_id):
+        self.tracker = tracker
+        self.uuid = tab_id
         self.plug = Gtk.Plug()
         self.plug.connect("destroy", Gtk.main_quit)
         
@@ -62,28 +54,33 @@ class BrowserWorker(IpcListener):
         self.plug.set_default_size(800, 600)
         self.plug.add(scrolled_window)
         self.plug.show_all()
-        self.send("PLUG ID: %s" % str(self.plug.get_id()))
+
+        self.send("attach_event", plug_id = str(self.plug.get_id()))
+        self.navigate_event(url)
+
+    def send(self, action, **packet):
+        """
+        """
+        self.tracker.send(action, target=self.uuid, **packet)
 
     def load_start_event(self, *args, **kargs):
         uri = self.webview.get_uri()
-        self.send("URI: %s" % uri)
+        self.send("update_uri", uri=uri)
         self.update_history_state()
     
     def push_title_change(self, *args, **kargs):
         title = self.webview.get_title()
         if title:
-            self.send("TITLE: %s" % str(title))
+            self.send("title_changed_event", new_title=str(title))
 
     def navigate_event(self, uri):
         self.webview.load_uri(uri)
-        self.send("URI: %s" % uri)
+        self.send("update_uri", uri=uri)
 
     def update_history_state(self):
-        data = json.dumps((
-            self.webview.can_go_back(),
-            self.webview.can_go_forward()
-        ))
-        self.send("HISTORY_STATE: %s" % data)
+        self.send("update_history_buttons",
+                  back=self.webview.can_go_back(),
+                  forward=self.webview.can_go_forward())
 
     def history_forward(self):
         self.webview.go_forward()
@@ -96,7 +93,16 @@ class BrowserWorker(IpcListener):
     def reload(self):
         self.webview.reload()
 
+
+class UniverseTracker(IpcListener):
+    def __init__(self):
+        IpcListener.__init__(self, IpcHandler(signal=self))
+        
+    def create_new_tab(self, target, url):
+        new_tab = BrowserWorker(self, url, target)
+        self.register(target, new_tab)
+
 if __name__ == "__main__":
     Gtk.init()
-    BrowserWorker()
+    UniverseTracker()
     Gtk.main()

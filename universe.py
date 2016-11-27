@@ -17,7 +17,6 @@
 # along with Ridinghood.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import re
 import sys
 import time
 import json
@@ -82,28 +81,33 @@ class IpcHandler(Thread):
                         GLib.idle_add(self.__signal)
             time.sleep(0.01)
     
-    def send(self, packet):
+    def send(self, action, **kargs):
         """
         Sends a "packet" to the other process.  Right now, a packet is
         just a line of ascii encoded text.
         """
-        if type(packet) is str:
-            self.__write.write(packet.strip() + "\n")
-            self.__write.flush()
-        elif type(packet) is unicode:
-            self.send(packet.encode('utf-8'))
-        else:
-            raise NotImplementedError("sending arbitrary objects via json")
+        packet = "JSON:" + json.dumps({
+            "action" : action,
+            "kargs" : kargs,
+        }).strip().replace("\n", chr(31))
+        
+        self.__write.write(packet + "\n")
+        self.__write.flush()
 
     def read(self):
         """
         Returns a list of new data from the other process.
         """
-        data = None
+        data = []
         if self.__ready.wait(0.01):
             self.__lock.acquire()
-            data = self.__new_data
-            self.__new_data = []
+            while self.__new_data:
+                raw = self.__new_data.pop(0)
+                if raw.startswith("JSON:"):
+                    raw = raw.replace(chr(31), "\n")
+                    data.append(json.loads(raw[5:]))
+                else:
+                    data.append(raw)
             self.__lock.release()
         return data
 
@@ -120,28 +124,39 @@ class IpcListener(object):
 
     See BrowserTab as an example of how to use this.
     """
-    _event_routing = {}
 
     def __init__(self, ipc):
         self._ipc = ipc
+        self.actors = {}
 
-    def send(self, packet):
-        self._ipc.send(packet)
+    def register(self, route_id, instance):
+        self.actors[route_id] = instance
+
+    def send(self, action, **kargs):
+        self._ipc.send(action, **kargs)
                 
     def routing_event(self):
-        for line in self._ipc.read():
+        for packet in self._ipc.read():
             handled = False
-            for pattern, handler in self._event_routing.items():
-                match = re.match(pattern, line)
-                if match:
-                    self.__getattribute__(handler)(**match.groupdict())
-                    handled = True
-                    break
-            if not handled and line.strip():
-                print "No handler found: %s" % line.strip()
+            if type(packet) is str:
+                sys.stderr.write(packet + "\n")
+
+            elif type(packet) is dict:
+                action = packet["action"]
+                kargs = packet["kargs"]
+                if hasattr(self, action):
+                    self.__getattribute__(action)(**kargs)
+                else:
+                    target = self.actors.get(kargs.get("target"))
+                    if target and hasattr(target, action):
+                        kargs.pop("target")
+                        target.__getattribute__(action)(**kargs)
+                    else:
+                        sys.stderr.write(
+                            "No handler found: %s" % packet.action)
 
 
-class Universe(object):
+class Universe(IpcListener):
     """
     This class is used by the browser frontend to create universe
     subprocesses, which encapsulate a clean browsing context.
@@ -157,15 +172,16 @@ class Universe(object):
     __next_universe__ = 1
     __active_universes__ = {}
 
-    def __init__(self, tab):
+    def __init__(self):
         self.universe_id = str(Universe.__next_universe__)
         Universe.__next_universe__ += 1
         Universe.__active_universes__[self.universe_id] = self
 
-        args_list = ["python", "webkit_plug.py", tab.url]
+        args_list = ["python", "webkit_plug.py"]
         self.proc = subprocess.Popen(
             args_list, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.ipc = IpcHandler(self.proc.stdout, self.proc.stdin, tab)
+        self.ipc = IpcHandler(self.proc.stdout, self.proc.stdin, self)
+        IpcListener.__init__(self, self.ipc)
 
     def __repr__(self):
         return "EARTH %s" % self.universe_id

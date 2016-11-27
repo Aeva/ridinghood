@@ -55,7 +55,7 @@ def url_domain(url):
     return ".".join(parts.netloc.split(".")[-2:])
 
 
-class BrowserTab(IpcListener):
+class BrowserTab(object):
     """
     This class represents a browser tab.  It is mostly boilerplate for
     event routing.
@@ -67,23 +67,18 @@ class BrowserTab(IpcListener):
     so some future refactoring will be needed to enable multiple tabs
     in the same universe.
     """
-
-    _event_routing = {
-        r'^PLUG ID: (?P<plug_id>\d+)$': "attach_event",
-        r'^TITLE: (?P<new_title>.*)$': "title_changed_event",
-        r'^HISTORY_STATE: (?P<blob>.*)$': "update_history_state",
-        r'^URI: (?P<uri>.*)$': "update_uri",
-    }
     
-    def __init__(self, browser, url):
-        self.uuid = uuid.uuid4().hex
+    def __init__(self, browser, url, universe):
         self.url = url
         self.title = "New Tab"
+        
+        self.uuid = uuid.uuid4().hex
         self.browser = browser
-        self.universe = Universe(self)
-        IpcListener.__init__(self, self.universe.ipc)
+        self.universe = universe
+        self.universe.register(self.uuid, self)
+
         self.init_ui_elements()
-        self.navigate_to(url)
+        self.send("create_new_tab", url=self.url)
 
     def init_ui_elements(self):
         # setup the XEmbed socket:
@@ -108,11 +103,16 @@ class BrowserTab(IpcListener):
         tree_view = self.browser.tab_tree_view
         tree_view.expand_row(uni_path, True)
 
+    def send(self, action, **packet):
+        """
+        """
+        self.universe.send(action, target=self.uuid, **packet)
+        
     def navigate_to(self, url):
         """
         Request that the universe open the given url.
         """
-        self.send("NAVIGATE: %s" % url)
+        self.send("navigate_event", uri=url)
 
     def activate(self, *args, **kargs):
         """
@@ -157,21 +157,22 @@ class BrowserTab(IpcListener):
         """
         Query the universe for the current status of the history buttons.
         """
-        self.send("REQ_HISTORY")
+        self.send("update_history_state")
 
-    def update_history_state(self, blob):
+    def update_history_buttons(self, back, forward):
         """
-        Event handler that is triggered by the browser universe reporting
-        the status of the history buttons.
+        Event handler that is triggered by a browser universe to update
+        the history navigation buttons.
         """
-        back, forward = json.loads(blob)
-        self.browser.update_history_buttons(back, forward)
+        self.browser.history_backward.set_sensitive(back)
+        self.browser.history_forward.set_sensitive(forward)
 
     def update_uri(self, uri):
         """
         Update the value shown in the url bar.
         """
-        self.browser.url_bar.set_text(uri)
+        if uri:
+            self.browser.url_bar.set_text(uri)
 
 
 class TabContextMenu(object):
@@ -351,12 +352,15 @@ class BrowserWindow(object):
             selector.select_path(path)
         self.push_focus_history(tab.uuid)
 
-    def new_tab(self, uri="about:blank"):
+    def new_tab(self, uri="about:blank", universe=None):
         """
         This method creates a new BrowserTab instance and connects it to
         the web browser!
         """
-        tab = BrowserTab(self, uri)
+        if not universe:
+            universe = Universe()
+
+        tab = BrowserTab(self, uri, universe)
         self.tabs[tab.uuid] = tab
         self.views.pack_start(tab.socket, True, True, 0)
         self.focus_tab(tab)
@@ -393,33 +397,23 @@ class BrowserWindow(object):
         if self.focused:
             self.focused.request_history_state()
 
-    def update_history_buttons(self, back, forward):
-        """
-        Event handler that is triggered by a browser universe to update
-        the history navigation buttons.
-        """
-        if back:
-            self.history_backward.set_sensitive(back)
-        if forward:
-            self.history_forward.set_sensitive(forward)
-
     def history_back(self, *args, **kargs):
         """
         Attempt to navigate backwards in the browsing history.
         """
-        self.focused.send("HISTORY_BACKWARD")
+        self.focused.send("history_backward")
         
     def history_forward(self, *args, **kargs):
         """
         Attempt to navigate forwards in the browsing history.
         """
-        self.focused.send("HISTORY_FORWARD")
+        self.focused.send("history_forward")
 
     def refresh_page(self, *args, **kargs):
         """
         Refresh the current page.
         """
-        self.focused.send("RELOAD")
+        self.focused.send("reload")
 
     def close_tab(self, tab):
         """
