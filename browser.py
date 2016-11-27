@@ -112,6 +112,8 @@ class BrowserTab(object):
         Request that the universe open the given url.
         """
         self.send("navigate_event", uri=url)
+        self.browser.url_bar.set_text(url)
+        self.url = url
 
     def activate(self, *args, **kargs):
         """
@@ -432,7 +434,6 @@ class BrowserWindow(object):
             self.viewport_grab_focus()
         else:
             self.new_tab(new_url)
-        self.url_bar.set_text(new_url)
 
     def url_bar_gains_focus(self, *args, **kargs):
         """
