@@ -24,7 +24,7 @@ import uuid
 from urlparse import urlsplit, urlunsplit
 
 import gi
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, GLib
 from universe import Universe, IpcListener
 
 
@@ -445,6 +445,10 @@ class BrowserWindow(object):
 
 if __name__ == "__main__":
     Gtk.init()
-    BrowserWindow()
-    Gtk.main()
-
+    browser = BrowserWindow()
+    try:
+        # using this instead of Gtk.main() so we can catch the
+        # KeyboardInterrupt event.
+        GLib.MainLoop().run()
+    except KeyboardInterrupt:
+        browser.shutdown_event()
